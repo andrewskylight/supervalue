@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SuperValue</title>
+  <meta name="theme-color" content="#1f6f43">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="SuperValue">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="row">
+      <h1>SuperValue</h1>
+      <button id="syncBtn" class="pill" type="button"></button>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en">EN</button>
+        <button type="button" data-lang="es">ES</button>
+      </div>
+      <button id="settingsBtn" class="icon" type="button" aria-label="Settings">⚙︎</button>
+    </div>
+    <nav class="tabs">
+      <button type="button" data-tab="shop"></button>
+      <button type="button" data-tab="all"></button>
+    </nav>
+  </header>
+
+  <main id="main"></main>
+
+  <!-- Item editor -->
+  <dialog id="editor"></dialog>
+  <!-- Settings -->
+  <dialog id="settings"></dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
