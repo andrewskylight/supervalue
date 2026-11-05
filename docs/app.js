@@ -2,12 +2,12 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.2.1';
+  var VERSION = '1.3.0';
 
   // ---------- text ----------
   var T = {
     en: {
-      shop: 'Isle list', compile: 'Compile list', all: 'All items', checkedHdr: 'Checked', noLoc: 'No boat location', onList: 'on list', needs: 'Needs isle', aisle: 'Isle',
+      shop: 'Isle list', compile: 'Compile list', all: 'All items', checkedHdr: 'Checked', checkAll: 'Check all', uncheckGroup: 'Uncheck all', noLoc: 'No boat location', onList: 'on list', needs: 'Needs isle', aisle: 'Isle',
       search: 'Search items…', notOnList: 'not on list', hideDone: 'Hide checked',
       showDone: 'Show checked', clearChecks: 'Uncheck all', clearConfirm: 'Uncheck every item?',
       setUp: 'Set up', syncing: 'Syncing…', waiting: 'waiting', offline: 'Offline',
@@ -26,7 +26,7 @@
       tripDone: 'List set for {d}: {c} quantities changed', lastTrip: 'Last list'
     },
     es: {
-      shop: 'Lista de pasillos', compile: 'Preparar lista', all: 'Todos', checkedHdr: 'Marcados', noLoc: 'Sin ubicación', onList: 'en la lista', needs: 'Falta pasillo', aisle: 'Pasillo',
+      shop: 'Lista de pasillos', compile: 'Preparar lista', all: 'Todos', checkedHdr: 'Marcados', checkAll: 'Marcar todo', uncheckGroup: 'Desmarcar todo', noLoc: 'Sin ubicación', onList: 'en la lista', needs: 'Falta pasillo', aisle: 'Pasillo',
       search: 'Buscar…', notOnList: 'no está en la lista', hideDone: 'Ocultar marcados',
       showDone: 'Mostrar marcados', clearChecks: 'Desmarcar todo', clearConfirm: '¿Desmarcar todos los artículos?',
       setUp: 'Configurar', syncing: 'Sincronizando…', waiting: 'pendientes', offline: 'Sin conexión',
@@ -238,7 +238,9 @@
       if (!visible.length) return;
       var left = items.filter(function (it) { return !S.checked[it.id]; }).length;
       h += '<section class="group' + (k ? '' : ' needs') + '"><h2>' + esc(groupLabel(k)) +
-        '<span class="count">' + left + '</span></h2><ul>';
+        '<span class="h2r"><span class="count">' + left + '</span>' +
+        '<button type="button" class="checkall" data-act="check-all" data-group="' + esc(k) + '">' +
+        esc(left ? t('checkAll') : t('uncheckGroup')) + '</button></span></h2><ul>';
       visible.forEach(function (it, i) {
         var done = !!S.checked[it.id];
         if (done && i === open.length) h += '<li class="subhead">' + esc(t('checkedHdr')) + ' · ' + got.length + '</li>';
@@ -483,6 +485,13 @@
       queue(id, 'qty', q); return;
     }
     if (act === 'new-list') { openTrip(); return; }
+    if (act === 'check-all') {
+      var gk = b.dataset.group;
+      var inGroup = view().filter(function (it) { return num(it.qty) > 0 && groupKey(it) === gk; });
+      var allDone = inGroup.every(function (it) { return S.checked[it.id]; });
+      inGroup.forEach(function (it) { if (allDone) delete S.checked[it.id]; else S.checked[it.id] = true; });
+      persist(); render(); return;
+    }
     if (act === 'toggle-done') { S.hideDone = !S.hideDone; persist(); render(); return; }
     if (act === 'clear-checks' && window.confirm(t('clearConfirm'))) { S.checked = {}; persist(); render(); }
   });

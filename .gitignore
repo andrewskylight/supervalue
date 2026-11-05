@@ -4,3 +4,4 @@ test/.key
 test/*.log
 test/entrada.csv
 phone-setup.txt
+Claude outputs/

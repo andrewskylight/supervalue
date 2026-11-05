@@ -19,7 +19,7 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
   });
   await p.reload(); await p.waitForTimeout(2500); await p.waitForSelector('.group');
   const v = await p.evaluate(() => window.__sva && window.__sva.version);
-  ok(v === '1.2.1', 'after mixed cache, app repaired itself and runs ' + v);
+  ok(v === fs.readFileSync(['docs','app'].map(d => path.join(__dirname, '..', d, 'app.js')).find(f => fs.existsSync(f)), 'utf8').match(/VERSION = '([\d.]+)'/)[1], 'after mixed cache, app repaired itself and runs ' + v);
   await p.click('[data-tab=compile]');
   ok(await p.locator('.group.loc').count() > 10, 'Compile list shows boat-location sections');
   await p.click('[data-tab=shop]');

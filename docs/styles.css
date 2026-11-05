@@ -130,3 +130,9 @@ dialog::backdrop { background: rgba(0,0,0,.4); }
 .group.loc .item { padding-left: 14px; }
 .group.loc .count { font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--muted); }
 .tabs button { font-size: 15px; }
+
+/* check all (per isle) */
+.group h2 { align-items: center; }
+.h2r { display: flex; align-items: center; gap: 10px; }
+.checkall { font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; color: inherit;
+  border: 1.5px solid currentColor; border-radius: 999px; padding: 4px 10px; opacity: .9; }
