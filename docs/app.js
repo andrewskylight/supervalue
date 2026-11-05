@@ -2,12 +2,12 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3.0';
+  var VERSION = '1.4.0';
 
   // ---------- text ----------
   var T = {
     en: {
-      shop: 'Isle list', compile: 'Compile list', all: 'All items', checkedHdr: 'Checked', checkAll: 'Check all', uncheckGroup: 'Uncheck all', noLoc: 'No boat location', onList: 'on list', needs: 'Needs isle', aisle: 'Isle',
+      shop: 'Isle list', compile: 'Compile list', all: 'All items', checkedHdr: 'Checked', checkAll: 'Check all', uncheckGroup: 'Uncheck all', addItem: 'Add item', add: 'Add', engName: 'English name', spaName: 'Spanish name', boatLoc: 'Boat location', unit: 'Unit', daily: 'Daily value', optional: 'optional', needName: 'Enter the English name', exists: 'Already in the list:', added: 'Added', needUpdate: 'The sheet script needs updating to add items', pickOrType: 'Pick or type a new one', noLoc: 'No boat location', onList: 'on list', needs: 'Needs isle', aisle: 'Isle',
       search: 'Search items…', notOnList: 'not on list', hideDone: 'Hide checked',
       showDone: 'Show checked', clearChecks: 'Uncheck all', clearConfirm: 'Uncheck every item?',
       setUp: 'Set up', syncing: 'Syncing…', waiting: 'waiting', offline: 'Offline',
@@ -26,7 +26,7 @@
       tripDone: 'List set for {d}: {c} quantities changed', lastTrip: 'Last list'
     },
     es: {
-      shop: 'Lista de pasillos', compile: 'Preparar lista', all: 'Todos', checkedHdr: 'Marcados', checkAll: 'Marcar todo', uncheckGroup: 'Desmarcar todo', noLoc: 'Sin ubicación', onList: 'en la lista', needs: 'Falta pasillo', aisle: 'Pasillo',
+      shop: 'Lista de pasillos', compile: 'Preparar lista', all: 'Todos', checkedHdr: 'Marcados', checkAll: 'Marcar todo', uncheckGroup: 'Desmarcar todo', addItem: 'Agregar artículo', add: 'Agregar', engName: 'Nombre en inglés', spaName: 'Nombre en español', boatLoc: 'Ubicación en el barco', unit: 'Unidad', daily: 'Valor diario', optional: 'opcional', needName: 'Escriba el nombre en inglés', exists: 'Ya está en la lista:', added: 'Agregado', needUpdate: 'Hay que actualizar el script de la hoja para agregar artículos', pickOrType: 'Elija o escriba una nueva', noLoc: 'Sin ubicación', onList: 'en la lista', needs: 'Falta pasillo', aisle: 'Pasillo',
       search: 'Buscar…', notOnList: 'no está en la lista', hideDone: 'Ocultar marcados',
       showDone: 'Mostrar marcados', clearChecks: 'Desmarcar todo', clearConfirm: '¿Desmarcar todos los artículos?',
       setUp: 'Configurar', syncing: 'Sincronizando…', waiting: 'pendientes', offline: 'Sin conexión',
@@ -107,9 +107,13 @@
 
   /** Items as the server sent them, with this phone's unsynced edits applied on top. */
   function view() {
-    var pend = {};
-    S.outbox.forEach(function (c) { (pend[c.id] = pend[c.id] || {})[c.field] = c.value; });
-    return S.items.map(function (it) {
+    var pend = {}, known = {}, extra = [];
+    S.items.forEach(function (it) { known[it.id] = 1; });
+    S.outbox.forEach(function (c) {
+      if (c.field === '_new') { if (!known[c.id]) { var n = { id: c.id }; for (var k in c.value) n[k] = c.value[k]; extra.push(n); } return; }
+      (pend[c.id] = pend[c.id] || {})[c.field] = c.value;
+    });
+    return S.items.concat(extra).map(function (it) {
       var p = pend[it.id]; if (!p) return it;
       var o = {}; for (var k in it) o[k] = it[k];
       for (var f in p) o[f] = p[f];
@@ -197,6 +201,9 @@
         '<button type="button" class="primary" data-act="open-settings">' + esc(t('setUp')) + '</button></section>';
       return;
     }
+    var fab = $('#addFab');
+    if (fab) { fab.hidden = !(S.tab === 'all' || S.tab === 'compile'); fab.textContent = '＋ ' + t('addItem'); }
+    document.body.classList.toggle('has-fab', S.tab === 'all' || S.tab === 'compile');
     if (S.tab === 'all' || S.tab === 'compile') renderAll(main); else renderShop(main);
   }
 
@@ -298,8 +305,8 @@
     var keys = Object.keys(groups).sort(function (a, b) { if (!a) return 1; if (!b) return -1; return a.localeCompare(b); });
     box.innerHTML = keys.map(function (k) {
       var onList = groups[k].filter(function (it) { return num(it.qty) > 0; }).length;
-      return '<section class="group loc"><h2>' + esc(k || t('noLoc')) + '<span class="count">' + onList + ' ' + esc(t('onList')) +
-        '</span></h2><ul>' + groups[k].map(allRow).join('') + '</ul></section>';
+      return '<section class="group loc"><h2>' + esc(k || t('noLoc')) + '<span class="h2r"><span class="count">' + onList + ' ' + esc(t('onList')) +
+        '</span><button type="button" class="checkall" data-act="add-item" data-loc="' + esc(k) + '">＋ ' + esc(t('add')) + '</button></span></h2><ul>' + groups[k].map(allRow).join('') + '</ul></section>';
     }).join('');
   }
 
@@ -311,6 +318,13 @@
     draft = { id: id, orig: it, qty: it.qty, aisle: it.aisle, area: it.area, side: it.side, pos: it.pos, level: it.level };
     drawEditor();
     $('#editor').showModal();
+  }
+  function openAdd(loc) {
+    draft = { isNew: true, id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), orig: {},
+      eng: '', spa: '', loc: loc || '', qty: 1, unit: '', daily: '', aisle: '', area: '', side: '', pos: '', level: '', err: '' };
+    drawEditor();
+    $('#editor').showModal();
+    var f = $('#editor [data-f=eng]'); if (f) f.focus();
   }
   function distinct(field) {
     var seen = {}, out = [];
@@ -333,11 +347,40 @@
     if (allowOther) h += '<button type="button" class="opt other" data-other="1">' + esc(t('other')) + '</button>';
     return h + '</div>';
   }
+  function textField(f, label, extra) {
+    return '<label class="lbl" for="nf-' + f + '">' + esc(label) + '</label><input id="nf-' + f + '" data-f="' + f + '" type="text" autocomplete="off" value="' +
+      esc(draft[f]) + '"' + (extra || '') + '>';
+  }
+  function datalist(id, field) {
+    return '<datalist id="' + id + '">' + distinct(field).map(function (v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>';
+  }
   function drawEditor() {
     var it = draft.orig;
     var maxAisle = 16;
     S.items.forEach(function (i) { var n = parseInt(i.aisle, 10); if (n > maxAisle && n < 60) maxAisle = n; });
     var aisles = []; for (var a = 1; a <= maxAisle; a++) aisles.push(String(a));
+    if (draft.isNew) {
+      var opt = ' (' + t('optional') + ')';
+      $('#editor').innerHTML = '<form method="dialog" class="sheet">' +
+        '<header><h3>' + esc(t('addItem')) + '</h3></header>' +
+        (draft.err ? '<p class="err">' + esc(draft.err) + '</p>' : '') +
+        textField('eng', t('engName')) + textField('spa', t('spaName') + opt) +
+        textField('loc', t('boatLoc'), ' list="dl-loc" placeholder="' + esc(t('pickOrType')) + '"') + datalist('dl-loc', 'loc') +
+        '<label class="lbl">' + esc(t('qty')) + '</label>' +
+        '<div class="stepper big" data-field="qty"><button type="button" data-step="-1">−</button><b>' +
+        esc(fmtQty(draft.qty)) + '</b><button type="button" data-step="1">+</button></div>' +
+        '<div class="two">' + '<div>' + textField('unit', t('unit') + opt, ' list="dl-unit"') + datalist('dl-unit', 'unit') + '</div>' +
+        '<div>' + textField('daily', t('daily') + opt, ' inputmode="decimal"') + '</div></div>' +
+        '<label class="lbl">' + esc(t('aisle')) + opt + '</label>' +
+        choiceRow('aisle', aisles, function (v) { return v; }, true).replace('class="choices"', 'class="choices grid"') +
+        '<label class="lbl">' + esc(t('area')) + '</label>' + choiceRow('area', distinct('area'), function (v) { return val('area', v); }, true) +
+        '<label class="lbl">' + esc(t('side')) + '</label>' + choiceRow('side', PRESETS.side, function (v) { return val('side', v); }, false) +
+        '<label class="lbl">' + esc(t('pos')) + '</label>' + choiceRow('pos', distinct('pos'), function (v) { return val('pos', v); }, true) +
+        '<label class="lbl">' + esc(t('level')) + '</label>' + choiceRow('level', distinct('level'), function (v) { return val('level', v); }, false) +
+        '<div class="actions"><button type="button" data-act="cancel">' + esc(t('cancel')) + '</button>' +
+        '<button type="button" class="primary" data-act="save">' + esc(t('add')) + '</button></div></form>';
+      return;
+    }
     var h = '<form method="dialog" class="sheet">' +
       '<header><h3>' + esc(name(it)) + '</h3><p class="alt">' + esc(otherName(it)) +
       (it.loc ? ' · ' + esc(t('boat')) + ': ' + esc(it.loc) : '') + '</p></header>' +
@@ -355,10 +398,28 @@
       '<button type="button" class="primary" data-act="save">' + esc(t('save')) + '</button></div></form>';
     $('#editor').innerHTML = h;
   }
+  $('#editor').addEventListener('input', function (e) {
+    var f = e.target.dataset && e.target.dataset.f;
+    if (f && draft) draft[f] = e.target.value;
+  });
   $('#editor').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     var dlg = $('#editor');
     if (b.dataset.act === 'cancel') { dlg.close(); return; }
+    if (b.dataset.act === 'save' && draft.isNew) {
+      var clean = function (v) { return String(v == null ? '' : v).trim(); };
+      var eng = clean(draft.eng);
+      if (!eng) { draft.err = t('needName'); drawEditor(); return; }
+      var dup = view().filter(function (x) { return clean(x.eng).toLowerCase() === eng.toLowerCase(); })[0];
+      if (dup) { draft.err = t('exists') + ' ' + dup.eng + (dup.loc ? ' (' + dup.loc + ')' : ''); drawEditor(); return; }
+      var dv = clean(draft.daily).replace(',', '.');
+      var item = { eng: eng, spa: clean(draft.spa), loc: clean(draft.loc), qty: num(draft.qty), unit: clean(draft.unit),
+        daily: dv === '' || isNaN(parseFloat(dv)) ? '' : parseFloat(dv),
+        aisle: clean(draft.aisle), area: clean(draft.area), side: clean(draft.side), pos: clean(draft.pos), level: clean(draft.level) };
+      S.outbox.push({ id: draft.id, field: '_new', value: item, ts: Date.now() });
+      persist(); render(); scheduleSync();
+      dlg.close(); toast(t('added') + ': ' + (S.lang === 'es' && item.spa ? item.spa : eng)); return;
+    }
     if (b.dataset.act === 'save') {
       ['qty', 'aisle', 'area', 'side', 'pos', 'level'].forEach(function (f) {
         var a = draft[f], o = draft.orig[f];
@@ -451,9 +512,12 @@
     return fetchJSON(S.cfg.url, { key: S.cfg.key, changes: batch }).then(function (data) {
       if (!data || !data.ok) throw new Error((data && data.error) || 'Bad response');
       S.items = data.items || [];
-      S.outbox = S.outbox.filter(function (c) { return batch.indexOf(c) < 0; });
-      // forget checkmarks for items that no longer exist
       var ids = {}; S.items.forEach(function (i) { ids[i.id] = 1; });
+      // a new item the sheet did not create (old script) stays queued, with its edits
+      var notMade = {}; batch.forEach(function (c) { if (c.field === '_new' && !ids[c.id]) notMade[c.id] = 1; });
+      S.outbox = S.outbox.filter(function (c) { return batch.indexOf(c) < 0 || notMade[c.id]; });
+      if (Object.keys(notMade).length) throw new Error(t('needUpdate'));
+      // forget checkmarks for items that no longer exist
       Object.keys(S.checked).forEach(function (id) { if (!ids[id]) delete S.checked[id]; });
       S.lastSync = Date.now(); S.lastError = null;
     }).catch(function (err) {
@@ -485,6 +549,7 @@
       queue(id, 'qty', q); return;
     }
     if (act === 'new-list') { openTrip(); return; }
+    if (act === 'add-item') { openAdd(b.dataset.loc || ''); return; }
     if (act === 'check-all') {
       var gk = b.dataset.group;
       var inGroup = view().filter(function (it) { return num(it.qty) > 0 && groupKey(it) === gk; });

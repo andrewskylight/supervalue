@@ -1,5 +1,5 @@
 /* Offline cache for the app itself. Data lives in localStorage; the sheet API is never cached. */
-var CACHE = 'sva-v1.3.0';
+var CACHE = 'sva-v1.4.0';
 var FILES = ['./', 'index.html', 'app.js', 'styles.css', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 

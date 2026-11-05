@@ -14,6 +14,7 @@
  *
  * Rules:
  *   - Rows are matched by "App ID", so renaming or re-sorting rows is safe.
+ *   - "Add item" in the app appends a new row at the bottom of Entrada.
  *   - Each editable field keeps its own "last changed" time. When two phones (or a
  *     phone and someone editing the sheet) change the same field, the newest change wins.
  */
@@ -219,6 +220,24 @@ function svaApplyChanges_(changes) {
     ids.forEach(function (r, i) { if (r[0]) rowOf[String(r[0])] = i + 2; });
 
     changes.forEach(function (ch) {
+      if (ch.field === '_new') {            // add a new item (row) — sent by the app's "Add item"
+        if (rowOf[String(ch.id)]) { skipped++; return; }   // already added (retry) — ignore
+        var v = ch.value || {};
+        if (!svaClean_(v.eng)) { skipped++; return; }
+        var width = sh.getLastColumn(), vals = [], stamps0 = {}, ts0 = Number(ch.ts) || Date.now();
+        for (var c = 0; c < width; c++) vals.push('');
+        ['eng', 'spa', 'loc', 'qty', 'unit', 'daily', 'aisle', 'area', 'side', 'pos', 'level'].forEach(function (f) {
+          if (!cols[f] || v[f] === undefined || v[f] === null || v[f] === '') return;
+          vals[cols[f] - 1] = (f === 'qty' || f === 'daily') ? Number(v[f]) : String(v[f]);
+        });
+        SVA_EDITABLE.forEach(function (f) { stamps0[f] = ts0; });
+        vals[cols.id - 1] = String(ch.id);
+        vals[cols.sync - 1] = JSON.stringify(stamps0);
+        sh.appendRow(vals);
+        rowOf[String(ch.id)] = sh.getLastRow();
+        applied++;
+        return;
+      }
       var row = rowOf[String(ch.id)];
       if (!row || SVA_EDITABLE.indexOf(ch.field) < 0 || !cols[ch.field]) { skipped++; return; }
       var syncCell = sh.getRange(row, cols.sync);
