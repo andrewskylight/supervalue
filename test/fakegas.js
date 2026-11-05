@@ -28,6 +28,7 @@ function makeSheet(name, grid) {
   });
   const sheet = {
     getName: () => name, getRange: range,
+    deleteRow: r => { g.splice(r - 1, 1); },
     appendRow: vals => { const n = sheet.getLastRow(); ensure(n + 1, vals.length); vals.forEach((v, i) => { g[n][i] = v; }); },
     getLastRow: () => { let n = g.length; while (n > 0 && g[n - 1].every(v => v === '')) n--; return n; },
     getLastColumn: () => { let w = 0; g.forEach(r => r.forEach((v, i) => { if (v !== '') w = Math.max(w, i + 1); })); return w; },

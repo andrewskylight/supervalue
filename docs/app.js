@@ -2,12 +2,12 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.4.0';
+  var VERSION = '1.6.0';
 
   // ---------- text ----------
   var T = {
     en: {
-      shop: 'Isle list', compile: 'Compile list', all: 'All items', checkedHdr: 'Checked', checkAll: 'Check all', uncheckGroup: 'Uncheck all', addItem: 'Add item', add: 'Add', engName: 'English name', spaName: 'Spanish name', boatLoc: 'Boat location', unit: 'Unit', daily: 'Daily value', optional: 'optional', needName: 'Enter the English name', exists: 'Already in the list:', added: 'Added', needUpdate: 'The sheet script needs updating to add items', pickOrType: 'Pick or type a new one', noLoc: 'No boat location', onList: 'on list', needs: 'Needs isle', aisle: 'Isle',
+      shop: 'Isle list', compile: 'Compile list', all: 'All items', checkedHdr: 'Checked', checkAll: 'Check all', uncheckGroup: 'Uncheck all', addItem: 'Add item', add: 'Add', del: 'Delete item', delConfirm: 'Delete "{n}" from the list and the sheet? This cannot be undone.', deleted: 'Deleted', engName: 'English name', spaName: 'Spanish name', boatLoc: 'Boat location', unit: 'Unit', daily: 'Daily value', optional: 'optional', needName: 'Enter the English name', exists: 'Already in the list:', added: 'Added', needUpdate: 'The sheet script needs updating to add items', pickOrType: 'Pick or type a new one', noLoc: 'No boat location', onList: 'on list', needs: 'Needs isle', aisle: 'Isle',
       search: 'Search items…', notOnList: 'not on list', hideDone: 'Hide checked',
       showDone: 'Show checked', clearChecks: 'Uncheck all', clearConfirm: 'Uncheck every item?',
       setUp: 'Set up', syncing: 'Syncing…', waiting: 'waiting', offline: 'Offline',
@@ -26,7 +26,7 @@
       tripDone: 'List set for {d}: {c} quantities changed', lastTrip: 'Last list'
     },
     es: {
-      shop: 'Lista de pasillos', compile: 'Preparar lista', all: 'Todos', checkedHdr: 'Marcados', checkAll: 'Marcar todo', uncheckGroup: 'Desmarcar todo', addItem: 'Agregar artículo', add: 'Agregar', engName: 'Nombre en inglés', spaName: 'Nombre en español', boatLoc: 'Ubicación en el barco', unit: 'Unidad', daily: 'Valor diario', optional: 'opcional', needName: 'Escriba el nombre en inglés', exists: 'Ya está en la lista:', added: 'Agregado', needUpdate: 'Hay que actualizar el script de la hoja para agregar artículos', pickOrType: 'Elija o escriba una nueva', noLoc: 'Sin ubicación', onList: 'en la lista', needs: 'Falta pasillo', aisle: 'Pasillo',
+      shop: 'Lista de pasillos', compile: 'Preparar lista', all: 'Todos', checkedHdr: 'Marcados', checkAll: 'Marcar todo', uncheckGroup: 'Desmarcar todo', addItem: 'Agregar artículo', add: 'Agregar', del: 'Eliminar artículo', delConfirm: '¿Eliminar "{n}" de la lista y de la hoja? No se puede deshacer.', deleted: 'Eliminado', engName: 'Nombre en inglés', spaName: 'Nombre en español', boatLoc: 'Ubicación en el barco', unit: 'Unidad', daily: 'Valor diario', optional: 'opcional', needName: 'Escriba el nombre en inglés', exists: 'Ya está en la lista:', added: 'Agregado', needUpdate: 'Hay que actualizar el script de la hoja para agregar artículos', pickOrType: 'Elija o escriba una nueva', noLoc: 'Sin ubicación', onList: 'en la lista', needs: 'Falta pasillo', aisle: 'Pasillo',
       search: 'Buscar…', notOnList: 'no está en la lista', hideDone: 'Ocultar marcados',
       showDone: 'Mostrar marcados', clearChecks: 'Desmarcar todo', clearConfirm: '¿Desmarcar todos los artículos?',
       setUp: 'Configurar', syncing: 'Sincronizando…', waiting: 'pendientes', offline: 'Sin conexión',
@@ -107,13 +107,14 @@
 
   /** Items as the server sent them, with this phone's unsynced edits applied on top. */
   function view() {
-    var pend = {}, known = {}, extra = [];
+    var pend = {}, known = {}, extra = [], gone = {};
     S.items.forEach(function (it) { known[it.id] = 1; });
     S.outbox.forEach(function (c) {
+      if (c.field === '_delete') { gone[c.id] = 1; return; }
       if (c.field === '_new') { if (!known[c.id]) { var n = { id: c.id }; for (var k in c.value) n[k] = c.value[k]; extra.push(n); } return; }
       (pend[c.id] = pend[c.id] || {})[c.field] = c.value;
     });
-    return S.items.concat(extra).map(function (it) {
+    return S.items.concat(extra).filter(function (it) { return !gone[it.id]; }).map(function (it) {
       var p = pend[it.id]; if (!p) return it;
       var o = {}; for (var k in it) o[k] = it[k];
       for (var f in p) o[f] = p[f];
@@ -247,7 +248,8 @@
       h += '<section class="group' + (k ? '' : ' needs') + '"><h2>' + esc(groupLabel(k)) +
         '<span class="h2r"><span class="count">' + left + '</span>' +
         '<button type="button" class="checkall" data-act="check-all" data-group="' + esc(k) + '">' +
-        esc(left ? t('checkAll') : t('uncheckGroup')) + '</button></span></h2><ul>';
+        esc(left ? t('checkAll') : t('uncheckGroup')) + '</button>' +
+        '<button type="button" class="checkall add" data-act="add-item" data-group="' + esc(k) + '" aria-label="' + esc(t('addItem')) + '">＋</button></span></h2><ul>';
       visible.forEach(function (it, i) {
         var done = !!S.checked[it.id];
         if (done && i === open.length) h += '<li class="subhead">' + esc(t('checkedHdr')) + ' · ' + got.length + '</li>';
@@ -319,9 +321,10 @@
     drawEditor();
     $('#editor').showModal();
   }
-  function openAdd(loc) {
+  function openAdd(loc, group) {
+    var g = (group || '').split('|');   // isle group key "aisle|area" -> pre-fill the isle, leave boat location blank
     draft = { isNew: true, id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), orig: {},
-      eng: '', spa: '', loc: loc || '', qty: 1, unit: '', daily: '', aisle: '', area: '', side: '', pos: '', level: '', err: '' };
+      eng: '', spa: '', loc: loc || '', qty: 1, unit: '', daily: '', aisle: g[0] || '', area: g[1] || '', side: '', pos: '', level: '', err: '' };
     drawEditor();
     $('#editor').showModal();
     var f = $('#editor [data-f=eng]'); if (f) f.focus();
@@ -395,7 +398,8 @@
       '<label class="lbl">' + esc(t('pos')) + '</label>' + choiceRow('pos', distinct('pos'), function (v) { return val('pos', v); }, true) +
       '<label class="lbl">' + esc(t('level')) + '</label>' + choiceRow('level', distinct('level'), function (v) { return val('level', v); }, false) +
       '<div class="actions"><button type="button" data-act="cancel">' + esc(t('cancel')) + '</button>' +
-      '<button type="button" class="primary" data-act="save">' + esc(t('save')) + '</button></div></form>';
+      '<button type="button" class="primary" data-act="save">' + esc(t('save')) + '</button></div>' +
+      '<div class="actions"><button type="button" class="link danger" data-act="delete">' + esc(t('del')) + '</button></div></form>';
     $('#editor').innerHTML = h;
   }
   $('#editor').addEventListener('input', function (e) {
@@ -406,6 +410,16 @@
     var b = e.target.closest('button'); if (!b) return;
     var dlg = $('#editor');
     if (b.dataset.act === 'cancel') { dlg.close(); return; }
+    if (b.dataset.act === 'delete') {
+      var nm = name(draft.orig);
+      if (!window.confirm(t('delConfirm').replace('{n}', nm))) return;
+      var id = draft.id;
+      var unsent = S.outbox.some(function (c) { return c.id === id && c.field === '_new'; });
+      S.outbox = S.outbox.filter(function (c) { return c.id !== id; });       // drop pending edits for it
+      if (!unsent) S.outbox.push({ id: id, field: '_delete', value: '', ts: Date.now() });   // never reached the sheet: nothing to send
+      delete S.checked[id];
+      persist(); dlg.close(); render(); scheduleSync(); toast(t('deleted') + ': ' + nm); return;
+    }
     if (b.dataset.act === 'save' && draft.isNew) {
       var clean = function (v) { return String(v == null ? '' : v).trim(); };
       var eng = clean(draft.eng);
@@ -502,19 +516,21 @@
     }).finally(function () { clearTimeout(timer); });
   }
 
-  var syncTimer = null;
+  var syncTimer = null, syncP = Promise.resolve();
   function scheduleSync() { clearTimeout(syncTimer); syncTimer = setTimeout(sync, 1500); }
 
   function sync(manual) {
-    if (!S.cfg.url || S.syncing) return Promise.resolve();
+    if (!S.cfg.url) return Promise.resolve();
+    if (S.syncing) return syncP.then(function () { return S.outbox.length ? sync(manual) : null; });   // wait, then send what's left
     S.syncing = true; renderSync();
     var batch = S.outbox.slice();
-    return fetchJSON(S.cfg.url, { key: S.cfg.key, changes: batch }).then(function (data) {
+    return (syncP = fetchJSON(S.cfg.url, { key: S.cfg.key, changes: batch }).then(function (data) {
       if (!data || !data.ok) throw new Error((data && data.error) || 'Bad response');
       S.items = data.items || [];
       var ids = {}; S.items.forEach(function (i) { ids[i.id] = 1; });
       // a new item the sheet did not create (old script) stays queued, with its edits
-      var notMade = {}; batch.forEach(function (c) { if (c.field === '_new' && !ids[c.id]) notMade[c.id] = 1; });
+      var notMade = {}; batch.forEach(function (c) {
+        if ((c.field === '_new' && !ids[c.id]) || (c.field === '_delete' && ids[c.id])) notMade[c.id] = 1; });
       S.outbox = S.outbox.filter(function (c) { return batch.indexOf(c) < 0 || notMade[c.id]; });
       if (Object.keys(notMade).length) throw new Error(t('needUpdate'));
       // forget checkmarks for items that no longer exist
@@ -527,7 +543,7 @@
       S.syncing = false; persist();
       var active = document.activeElement;
       if (!(active && active.id === 'search')) render(); else { renderSync(); renderAllList(); }
-    });
+    }));
   }
 
   // ---------- events ----------
@@ -549,7 +565,7 @@
       queue(id, 'qty', q); return;
     }
     if (act === 'new-list') { openTrip(); return; }
-    if (act === 'add-item') { openAdd(b.dataset.loc || ''); return; }
+    if (act === 'add-item') { openAdd(b.dataset.loc || '', b.dataset.group || ''); return; }
     if (act === 'check-all') {
       var gk = b.dataset.group;
       var inGroup = view().filter(function (it) { return num(it.qty) > 0 && groupKey(it) === gk; });

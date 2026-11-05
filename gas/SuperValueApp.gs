@@ -14,7 +14,7 @@
  *
  * Rules:
  *   - Rows are matched by "App ID", so renaming or re-sorting rows is safe.
- *   - "Add item" in the app appends a new row at the bottom of Entrada.
+ *   - "Add item" in the app appends a new row at the bottom of Entrada; "Delete item" removes the row.
  *   - Each editable field keeps its own "last changed" time. When two phones (or a
  *     phone and someone editing the sheet) change the same field, the newest change wins.
  */
@@ -235,6 +235,16 @@ function svaApplyChanges_(changes) {
         vals[cols.sync - 1] = JSON.stringify(stamps0);
         sh.appendRow(vals);
         rowOf[String(ch.id)] = sh.getLastRow();
+        applied++;
+        return;
+      }
+      if (ch.field === '_delete') {         // remove an item (row) — sent by the app's "Delete item"
+        var drow = rowOf[String(ch.id)];
+        if (!drow) { skipped++; return; }    // already gone
+        sh.deleteRow(drow);
+        rowOf = {};                            // rows below moved up: rebuild the index
+        var left = sh.getLastRow() - 1;
+        if (left > 0) sh.getRange(2, cols.id, left, 1).getValues().forEach(function (r, i) { if (r[0]) rowOf[String(r[0])] = i + 2; });
         applied++;
         return;
       }
