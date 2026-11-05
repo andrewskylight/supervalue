@@ -112,3 +112,12 @@ dialog::backdrop { background: rgba(0,0,0,.4); }
 
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 15px; z-index: 50; max-width: 90vw; }
+
+/* new list */
+.newlist { background: var(--brand); color: var(--brand-ink); font-weight: 700; font-size: 14px;
+  padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
+.bar { gap: 10px; }
+.bar .progress { margin-right: auto; }
+.searchbox { display: flex; gap: 8px; align-items: center; }
+.searchbox input { flex: 1; min-width: 0; }
+.actions.trip button { font-size: 19px; padding: 18px; }

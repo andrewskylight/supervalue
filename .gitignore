@@ -1,0 +1,6 @@
+node_modules/
+test/shots/
+test/.key
+test/*.log
+test/entrada.csv
+phone-setup.txt

@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
 
   // ---------- text ----------
   var T = {
@@ -20,7 +20,10 @@
       saved: 'Saved', welcome: 'Connect this phone to the Google Sheet once while you have internet. After that the list works offline.',
       lastSync: 'Last sync', pending: 'Changes waiting to sync', boat: 'Boat', done: 'done',
       emptyShop: 'Nothing on the list. Add quantities in “All items”.', close: 'Close',
-      syncError: 'Sync failed'
+      syncError: 'Sync failed',
+      newList: 'New list', tripTitle: 'New shopping list', oneDay: '1 day', twoDays: '2 days',
+      tripHint: '{n} items with a daily value are set to daily value × days (rounded up). Other quantities stay as they are. Check-marks are cleared.',
+      tripDone: 'List set for {d}: {c} quantities changed', lastTrip: 'Last list'
     },
     es: {
       shop: 'Lista de compras', all: 'Todos', needs: 'Falta pasillo', aisle: 'Pasillo',
@@ -36,7 +39,10 @@
       saved: 'Guardado', welcome: 'Conecte este teléfono a la hoja de Google una vez con internet. Después la lista funciona sin conexión.',
       lastSync: 'Última sincronización', pending: 'Cambios por sincronizar', boat: 'Barco', done: 'listos',
       emptyShop: 'La lista está vacía. Agregue cantidades en “Todos”.', close: 'Cerrar',
-      syncError: 'Error al sincronizar'
+      syncError: 'Error al sincronizar',
+      newList: 'Nueva lista', tripTitle: 'Nueva lista de compras', oneDay: '1 día', twoDays: '2 días',
+      tripHint: '{n} artículos con valor diario se ajustan a valor diario × días (redondeado hacia arriba). Las demás cantidades no cambian. Se borran las marcas.',
+      tripDone: 'Lista para {d}: {c} cantidades cambiadas', lastTrip: 'Última lista'
     }
   };
   // Translations for values stored in the sheet (sheet keeps the English value)
@@ -69,11 +75,12 @@
     tab: load('tab', 'shop'),
     hideDone: load('hideDone', false),
     lastSync: load('lastSync', 0),
+    trip: load('trip', null),
     syncing: false, lastError: null, query: ''
   };
   function persist() {
     store('cfg', S.cfg); store('items', S.items); store('outbox', S.outbox); store('checked', S.checked);
-    store('lang', S.lang); store('tab', S.tab); store('hideDone', S.hideDone); store('lastSync', S.lastSync);
+    store('lang', S.lang); store('tab', S.tab); store('hideDone', S.hideDone); store('lastSync', S.lastSync); store('trip', S.trip);
   }
 
   // ---------- helpers ----------
@@ -116,6 +123,42 @@
     S.outbox.push({ id: id, field: field, value: value, ts: Date.now() });
     persist(); render(); scheduleSync();
   }
+
+  // ---------- new list (trip length) ----------
+  function dailyItems() { return view().filter(function (it) { return num(it.daily) > 0; }); }
+  function tripQty(it, days) { return Math.ceil(num(it.daily) * days - 1e-9); }   // round up: no half bottles
+  function applyTrip(days) {
+    var ts = Date.now(), changed = 0;
+    dailyItems().forEach(function (it) {
+      var q = tripQty(it, days);
+      if (String(it.qty) === String(q)) return;
+      S.outbox = S.outbox.filter(function (c) { return !(c.id === it.id && c.field === 'qty'); });
+      S.outbox.push({ id: it.id, field: 'qty', value: q, ts: ts });
+      changed++;
+    });
+    S.checked = {};
+    S.trip = { days: days, at: ts };
+    S.tab = 'shop';
+    persist(); $('#main').innerHTML = ''; render(); scheduleSync();
+    toast(t('tripDone').replace('{d}', days === 1 ? t('oneDay') : t('twoDays')).replace('{c}', changed));
+  }
+  function openTrip() {
+    var last = S.trip ? (S.trip.days === 1 ? t('oneDay') : t('twoDays')) + ' · ' +
+      new Date(S.trip.at).toLocaleDateString(S.lang === 'es' ? 'es' : 'en', { month: 'short', day: 'numeric' }) : '';
+    $('#trip').innerHTML = '<form method="dialog" class="sheet">' +
+      '<header><h3>' + esc(t('tripTitle')) + '</h3></header>' +
+      '<p class="meta">' + esc(t('tripHint').replace('{n}', dailyItems().length)) + '</p>' +
+      '<div class="actions trip"><button type="button" class="primary" data-days="1">' + esc(t('oneDay')) + '</button>' +
+      '<button type="button" class="primary" data-days="2">' + esc(t('twoDays')) + '</button></div>' +
+      '<div class="actions"><button type="button" data-act="close">' + esc(t('cancel')) + '</button></div>' +
+      (last ? '<p class="meta">' + esc(t('lastTrip')) + ': ' + esc(last) + '</p>' : '') + '</form>';
+    $('#trip').showModal();
+  }
+  $('#trip').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.days) { $('#trip').close(); applyTrip(Number(b.dataset.days)); }
+    else if (b.dataset.act === 'close') $('#trip').close();
+  });
 
   // ---------- grouping ----------
   function groupKey(it) { return it.aisle ? it.aisle + '|' + (it.area || '') : ''; }
@@ -177,13 +220,14 @@
 
   function renderShop(main) {
     var list = view().filter(function (it) { return num(it.qty) > 0; });
-    if (!list.length) { main.innerHTML = '<p class="empty">' + esc(t('emptyShop')) + '</p>'; return; }
+    var newBtn = '<button type="button" class="newlist" data-act="new-list">＋ ' + esc(t('newList')) + '</button>';
+    if (!list.length) { main.innerHTML = '<div class="bar">' + newBtn + '</div><p class="empty">' + esc(t('emptyShop')) + '</p>'; return; }
     var doneCount = list.filter(function (it) { return S.checked[it.id]; }).length;
     var groups = {};
     list.forEach(function (it) { (groups[groupKey(it)] = groups[groupKey(it)] || []).push(it); });
     var keys = Object.keys(groups).sort(cmpGroups);
 
-    var h = '<div class="bar"><span class="progress"><b>' + doneCount + '</b> / ' + list.length + ' ' + esc(t('done')) + '</span>' +
+    var h = '<div class="bar">' + newBtn + '<span class="progress"><b>' + doneCount + '</b> / ' + list.length + ' ' + esc(t('done')) + '</span>' +
       '<button type="button" class="link" data-act="toggle-done">' + esc(S.hideDone ? t('showDone') : t('hideDone')) + '</button></div>';
     keys.forEach(function (k) {
       var items = groups[k].sort(cmpItems);
@@ -212,7 +256,8 @@
   function renderAll(main) {
     if (!$('#search', main)) {
       main.innerHTML = '<div class="searchbox"><input id="search" type="search" autocomplete="off" placeholder="' +
-        esc(t('search')) + '"></div><ul id="allList" class="all"></ul>';
+        esc(t('search')) + '"><button type="button" class="newlist" data-act="new-list">＋ ' + esc(t('newList')) +
+        '</button></div><ul id="allList" class="all"></ul>';
       var s = $('#search'); s.value = S.query;
       s.addEventListener('input', function () { S.query = s.value; renderAllList(); });
     } else {
@@ -423,6 +468,7 @@
       var q = Math.max(0, num(it.qty) + (act === 'plus' ? 1 : -1));
       queue(id, 'qty', q); return;
     }
+    if (act === 'new-list') { openTrip(); return; }
     if (act === 'toggle-done') { S.hideDone = !S.hideDone; persist(); render(); return; }
     if (act === 'clear-checks' && window.confirm(t('clearConfirm'))) { S.checked = {}; persist(); render(); }
   });
