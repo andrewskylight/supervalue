@@ -2,12 +2,12 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.2';
+  var VERSION = '1.2.0';
 
   // ---------- text ----------
   var T = {
     en: {
-      shop: 'Isle list', all: 'All items', needs: 'Needs isle', aisle: 'Isle',
+      shop: 'Isle list', compile: 'Compile list', all: 'All items', checkedHdr: 'Checked', noLoc: 'No boat location', onList: 'on list', needs: 'Needs isle', aisle: 'Isle',
       search: 'Search items…', notOnList: 'not on list', hideDone: 'Hide checked',
       showDone: 'Show checked', clearChecks: 'Uncheck all', clearConfirm: 'Uncheck every item?',
       setUp: 'Set up', syncing: 'Syncing…', waiting: 'waiting', offline: 'Offline',
@@ -26,7 +26,7 @@
       tripDone: 'List set for {d}: {c} quantities changed', lastTrip: 'Last list'
     },
     es: {
-      shop: 'Lista de pasillos', all: 'Todos', needs: 'Falta pasillo', aisle: 'Pasillo',
+      shop: 'Lista de pasillos', compile: 'Preparar lista', all: 'Todos', checkedHdr: 'Marcados', noLoc: 'Sin ubicación', onList: 'en la lista', needs: 'Falta pasillo', aisle: 'Pasillo',
       search: 'Buscar…', notOnList: 'no está en la lista', hideDone: 'Ocultar marcados',
       showDone: 'Mostrar marcados', clearChecks: 'Desmarcar todo', clearConfirm: '¿Desmarcar todos los artículos?',
       setUp: 'Configurar', syncing: 'Sincronizando…', waiting: 'pendientes', offline: 'Sin conexión',
@@ -176,6 +176,7 @@
     if (pa[0] !== pb[0]) return pa[0].localeCompare(pb[0]);
     return (pa[1] || '').localeCompare(pb[1] || '');
   }
+  function byName(a, b) { return name(a).localeCompare(name(b)); }
   function cmpItems(a, b) {
     var pa = a.pos in POS_ORDER ? POS_ORDER[a.pos] : 1.5, pb = b.pos in POS_ORDER ? POS_ORDER[b.pos] : 1.5;
     if (pa !== pb) return pa - pb;
@@ -196,7 +197,7 @@
         '<button type="button" class="primary" data-act="open-settings">' + esc(t('setUp')) + '</button></section>';
       return;
     }
-    if (S.tab === 'all') renderAll(main); else renderShop(main);
+    if (S.tab === 'all' || S.tab === 'compile') renderAll(main); else renderShop(main);
   }
 
   function renderSync() {
@@ -230,14 +231,17 @@
     var h = '<div class="bar">' + newBtn + '<span class="progress"><b>' + doneCount + '</b> / ' + list.length + ' ' + esc(t('done')) + '</span>' +
       '<button type="button" class="link" data-act="toggle-done">' + esc(S.hideDone ? t('showDone') : t('hideDone')) + '</button></div>';
     keys.forEach(function (k) {
-      var items = groups[k].sort(cmpItems);
-      var visible = items.filter(function (it) { return !(S.hideDone && S.checked[it.id]); });
+      var items = groups[k].sort(byName);
+      var open = items.filter(function (it) { return !S.checked[it.id]; });
+      var got = items.filter(function (it) { return S.checked[it.id]; });
+      var visible = S.hideDone ? open : open.concat(got);
       if (!visible.length) return;
       var left = items.filter(function (it) { return !S.checked[it.id]; }).length;
       h += '<section class="group' + (k ? '' : ' needs') + '"><h2>' + esc(groupLabel(k)) +
         '<span class="count">' + left + '</span></h2><ul>';
-      visible.forEach(function (it) {
+      visible.forEach(function (it, i) {
         var done = !!S.checked[it.id];
+        if (done && i === open.length) h += '<li class="subhead">' + esc(t('checkedHdr')) + ' · ' + got.length + '</li>';
         h += '<li class="item' + (done ? ' done' : '') + '" data-id="' + esc(it.id) + '">' +
           '<button type="button" class="check" data-act="check" aria-pressed="' + done + '" aria-label="✓"></button>' +
           '<button type="button" class="body" data-act="edit">' +
@@ -257,7 +261,7 @@
     if (!$('#search', main)) {
       main.innerHTML = '<div class="searchbox"><input id="search" type="search" autocomplete="off" placeholder="' +
         esc(t('search')) + '"><button type="button" class="newlist" data-act="new-list">＋ ' + esc(t('newList')) +
-        '</button></div><ul id="allList" class="all"></ul>';
+        '</button></div><div id="allList"></div>';
       var s = $('#search'); s.value = S.query;
       s.addEventListener('input', function () { S.query = s.value; renderAllList(); });
     } else {
@@ -266,25 +270,35 @@
     renderAllList();
   }
 
+  function allRow(it) {
+    var on = num(it.qty) > 0;
+    return '<li class="item' + (on ? '' : ' off') + '" data-id="' + esc(it.id) + '">' +
+      '<button type="button" class="body" data-act="edit">' +
+      '<span class="name">' + esc(name(it)) + (it._pending ? ' <i class="dot"></i>' : '') + '</span>' +
+      '<span class="sub"><span class="chip ' + (it.aisle ? 'aisle' : 'add') + '">' +
+      esc(it.aisle ? groupLabel(groupKey(it)) : t('needs')) + '</span>' +
+      (on ? '' : '<span class="chip muted">' + esc(t('notOnList')) + '</span>') + '</span></button>' +
+      '<span class="stepper"><button type="button" data-act="minus" aria-label="−">−</button>' +
+      '<b>' + esc(fmtQty(it.qty)) + '</b>' +
+      '<button type="button" data-act="plus" aria-label="+">+</button></span></li>';
+  }
+
   function renderAllList() {
+    var box = $('#allList'); if (!box) return;
     var q = S.query.trim().toLowerCase();
     var list = view().filter(function (it) {
-      return !q || (it.eng + ' ' + it.spa).toLowerCase().indexOf(q) >= 0;
-    }).sort(function (a, b) { return name(a).localeCompare(name(b)); });
-    var h = '';
-    list.forEach(function (it) {
-      var on = num(it.qty) > 0;
-      h += '<li class="item' + (on ? '' : ' off') + '" data-id="' + esc(it.id) + '">' +
-        '<button type="button" class="body" data-act="edit">' +
-        '<span class="name">' + esc(name(it)) + (it._pending ? ' <i class="dot"></i>' : '') + '</span>' +
-        '<span class="sub"><span class="chip ' + (it.aisle ? 'aisle' : 'add') + '">' +
-        esc(it.aisle ? groupLabel(groupKey(it)) : t('needs')) + '</span>' +
-        (on ? '' : '<span class="chip muted">' + esc(t('notOnList')) + '</span>') + '</span></button>' +
-        '<span class="stepper"><button type="button" data-act="minus" aria-label="−">−</button>' +
-        '<b>' + esc(fmtQty(it.qty)) + '</b>' +
-        '<button type="button" data-act="plus" aria-label="+">+</button></span></li>';
-    });
-    $('#allList').innerHTML = h;
+      return !q || (it.eng + ' ' + it.spa + ' ' + it.loc).toLowerCase().indexOf(q) >= 0;
+    }).sort(byName);
+    if (S.tab !== 'compile') { box.innerHTML = '<ul class="all">' + list.map(allRow).join('') + '</ul>'; return; }
+    // Compile list: sections by boat location, every item, A-Z inside each section
+    var groups = {};
+    list.forEach(function (it) { (groups[it.loc || ''] = groups[it.loc || ''] || []).push(it); });
+    var keys = Object.keys(groups).sort(function (a, b) { if (!a) return 1; if (!b) return -1; return a.localeCompare(b); });
+    box.innerHTML = keys.map(function (k) {
+      var onList = groups[k].filter(function (it) { return num(it.qty) > 0; }).length;
+      return '<section class="group loc"><h2>' + esc(k || t('noLoc')) + '<span class="count">' + onList + ' ' + esc(t('onList')) +
+        '</span></h2><ul>' + groups[k].map(allRow).join('') + '</ul></section>';
+    }).join('');
   }
 
   // ---------- item editor ----------

@@ -21,7 +21,7 @@ const setupHash = '#setup=' + Buffer.from(JSON.stringify({ url: API, key })).toS
   await a.goto(APP + setupHash);
   await a.waitForSelector('.group');
   const groups = await a.$$eval('.group h2', hs => hs.map(h => h.firstChild.textContent));
-  ok(groups[0] === 'Needs aisle', 'needs-aisle group is first: ' + groups.slice(0, 4).join(' | '));
+  ok(groups[0] === 'Needs isle', 'needs-aisle group is first: ' + groups.slice(0, 4).join(' | '));
   const needs = await a.$$eval('.group.needs .item', l => l.length);
   ok(needs === 8, 'needs-aisle has 8 items (got ' + needs + ')');
   const total = await a.$eval('.progress', e => e.textContent);
@@ -44,13 +44,13 @@ const setupHash = '#setup=' + Buffer.from(JSON.stringify({ url: API, key })).toS
   await a.click('#editor .choices[data-field=side] .opt[data-v="L"]');
   await a.click('#editor .choices[data-field=level] .opt[data-v="Top"]');
   await a.click('#editor [data-act=save]');
-  const a3 = a.locator('.group', { hasText: 'Aisle 3' });
+  const a3 = a.locator('.group', { hasText: 'Isle 3' });
   ok(await a3.locator('.item', { hasText: 'cookies' }).count() === 1, 'cookies moved into Aisle 3 while offline');
   ok((await a.textContent('#syncBtn')).includes('3 waiting'), 'pill shows 3 waiting changes: ' + await a.textContent('#syncBtn'));
   await a.locator('.item', { hasText: 'bananas' }).locator('[data-act=check]').click();
   await a.reload(); await a.waitForSelector('.group');
   ok(await a.locator('.item.done', { hasText: 'bananas' }).count() === 1, 'checkmark survives reload offline');
-  ok(await a.locator('.group', { hasText: 'Aisle 3' }).locator('.item', { hasText: 'cookies' }).count() === 1, 'offline edit survives reload');
+  ok(await a.locator('.group', { hasText: 'Isle 3' }).locator('.item', { hasText: 'cookies' }).count() === 1, 'offline edit survives reload');
   await a.screenshot({ path: path.join(shots, '2-shop-offline.png') });
 
   // 3. back home: sync
@@ -81,7 +81,7 @@ const setupHash = '#setup=' + Buffer.from(JSON.stringify({ url: API, key })).toS
   await b.waitForFunction(() => !document.querySelector('#syncBtn').textContent.includes('waiting'));
   st = await ctl('');
   ok(st.grid.find(r => r[0] === 'cookies')[col('SV-Isle')] === 5, 'newer sheet edit kept over older phone edit');
-  ok(await b.locator('.group', { hasText: 'Aisle 5' }).locator('.item', { hasText: 'cookies' }).count() === 1, 'phone B now shows Aisle 5');
+  ok(await b.locator('.group', { hasText: 'Isle 5' }).locator('.item', { hasText: 'cookies' }).count() === 1, 'phone B now shows Aisle 5');
 
   // 5. Spanish + All items tab
   await a.click('[data-lang=es]');
