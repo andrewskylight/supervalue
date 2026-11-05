@@ -2,12 +2,12 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.1.1';
 
   // ---------- text ----------
   var T = {
     en: {
-      shop: 'Shopping list', all: 'All items', needs: 'Needs aisle', aisle: 'Aisle',
+      shop: 'Isle list', all: 'All items', needs: 'Needs aisle', aisle: 'Aisle',
       search: 'Search items…', notOnList: 'not on list', hideDone: 'Hide checked',
       showDone: 'Show checked', clearChecks: 'Uncheck all', clearConfirm: 'Uncheck every item?',
       setUp: 'Set up', syncing: 'Syncing…', waiting: 'waiting', offline: 'Offline',
@@ -26,7 +26,7 @@
       tripDone: 'List set for {d}: {c} quantities changed', lastTrip: 'Last list'
     },
     es: {
-      shop: 'Lista de compras', all: 'Todos', needs: 'Falta pasillo', aisle: 'Pasillo',
+      shop: 'Lista de pasillos', all: 'Todos', needs: 'Falta pasillo', aisle: 'Pasillo',
       search: 'Buscar…', notOnList: 'no está en la lista', hideDone: 'Ocultar marcados',
       showDone: 'Mostrar marcados', clearChecks: 'Desmarcar todo', clearConfirm: '¿Desmarcar todos los artículos?',
       setUp: 'Configurar', syncing: 'Sincronizando…', waiting: 'pendientes', offline: 'Sin conexión',
