@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.2.0';
+  var VERSION = '1.2.1';
 
   // ---------- text ----------
   var T = {
@@ -502,6 +502,20 @@
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function () { /* app still works online */ });
   }
+
+  // Self-check: page and script must be the same version. If an update left them mixed, clear the cache and reload once.
+  var pageVer = document.querySelector('meta[name="app-version"]');
+  pageVer = pageVer && pageVer.content;
+  if (pageVer !== VERSION) {
+    var tried = false; try { tried = sessionStorage.getItem('sva.fix') === pageVer + '>' + VERSION; } catch (e) { }
+    if (!tried && window.caches) {
+      try { sessionStorage.setItem('sva.fix', pageVer + '>' + VERSION); } catch (e) { }
+      caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })
+        .then(function () { location.reload(); });
+      return;
+    }
+  }
+  if (!T.en[S.tab]) S.tab = 'shop';
 
   render();
   sync();

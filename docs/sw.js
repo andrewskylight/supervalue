@@ -1,10 +1,13 @@
 /* Offline cache for the app itself. Data lives in localStorage; the sheet API is never cached. */
-var CACHE = 'sva-v1.2.0';
+var CACHE = 'sva-v1.2.1';
 var FILES = ['./', 'index.html', 'app.js', 'styles.css', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
+  e.waitUntil(caches.open(CACHE).then(function (c) {
+    // cache:'reload' skips the browser's HTTP cache, so a new version never mixes with stale files
+    return c.addAll(FILES.map(function (f) { return new Request(f, { cache: 'reload' }); }));
+  }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (e) {
@@ -19,7 +22,7 @@ self.addEventListener('fetch', function (e) {
   // Cached copy first (opens instantly even on weak store signal); refresh the cache in the background.
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then(function (hit) {
-      var net = fetch(req).then(function (res) {
+      var net = fetch(req, { cache: 'no-cache' }).then(function (res) {
         if (res && res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
         return res;
       });
