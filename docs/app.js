@@ -2,17 +2,17 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.1';
+  var VERSION = '1.1.2';
 
   // ---------- text ----------
   var T = {
     en: {
-      shop: 'Isle list', all: 'All items', needs: 'Needs aisle', aisle: 'Aisle',
+      shop: 'Isle list', all: 'All items', needs: 'Needs isle', aisle: 'Isle',
       search: 'Search items…', notOnList: 'not on list', hideDone: 'Hide checked',
       showDone: 'Show checked', clearChecks: 'Uncheck all', clearConfirm: 'Uncheck every item?',
       setUp: 'Set up', syncing: 'Syncing…', waiting: 'waiting', offline: 'Offline',
       synced: 'Synced', never: 'not yet', save: 'Save', cancel: 'Cancel', qty: 'Quantity',
-      area: 'Section', side: 'Side', pos: 'Along the aisle', level: 'Shelf', none: '—',
+      area: 'Section', side: 'Side', pos: 'Along the isle', level: 'Shelf', none: '—',
       other: 'Other…', settings: 'Settings', url: 'Sheet script URL', key: 'App key',
       pasteLink: 'Or paste a setup link', copyLink: 'Copy setup link for the other phone',
       copied: 'Setup link copied', syncNow: 'Sync now', reset: 'Clear data on this phone',
